@@ -7,6 +7,7 @@ import { Slider } from "@/components/ui/slider";
 import ImageUpload from "@/components/ImageUpload";
 import ParameterControl from "@/components/ParameterControl";
 import { toast } from "sonner";
+import { generateSTL } from "@/utils/stlGenerator";
 
 const Index = () => {
   const [image, setImage] = useState<File | null>(null);
@@ -16,7 +17,7 @@ const Index = () => {
     outerDiameter: 100,
     innerDiameter: 30,
     grooveDepth: 1,
-    grooveDistance: 40, // New parameter for groove distance from center
+    grooveDistance: 40,
   });
 
   const handleImageUpload = useCallback((file: File) => {
@@ -35,9 +36,49 @@ const Index = () => {
     }
 
     try {
-      // TODO: Implement STL generation
+      // Create a canvas to get the image data
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      const img = new Image();
+
+      // Create a promise to handle image loading
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = URL.createObjectURL(image);
+      });
+
+      // Set canvas size to match image dimensions
+      canvas.width = img.width;
+      canvas.height = img.height;
+      
+      // Draw image to canvas and get image data
+      ctx?.drawImage(img, 0, 0);
+      const imageData = ctx?.getImageData(0, 0, canvas.width, canvas.height);
+
+      if (!imageData) {
+        throw new Error("Failed to process image");
+      }
+
+      // Generate STL file
+      const stlBlob = await generateSTL(imageData, parameters);
+
+      // Create download link
+      const downloadUrl = URL.createObjectURL(stlBlob);
+      const downloadLink = document.createElement("a");
+      downloadLink.href = downloadUrl;
+      downloadLink.download = "lithophane.stl";
+      
+      // Trigger download
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      
+      // Clean up
+      URL.revokeObjectURL(downloadUrl);
       toast.success("STL file generated successfully!");
     } catch (error) {
+      console.error("STL generation error:", error);
       toast.error("Failed to generate STL file");
     }
   }, [image, parameters]);
