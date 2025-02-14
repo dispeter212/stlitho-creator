@@ -1,4 +1,3 @@
-
 // This implementation generates a lithophane STL file from image data
 export const generateSTL = async (
   imageData: ImageData,
@@ -7,12 +6,12 @@ export const generateSTL = async (
     minHeight: number;
     outerDiameter: number;
     innerDiameter: number;
-    grooveDepth: number;
-    grooveDistance: number;
+    wallHeight: number;
+    wallDistance: number;
   }
 ) => {
   // Constants
-  const GROOVE_WIDTH = 0.5; // Fixed groove width in mm
+  const WALL_WIDTH = 0.5; // Fixed wall width in mm
   const RESOLUTION = Math.min(imageData.width, imageData.height); // Number of segments
   const BYTES_PER_TRIANGLE = 50; // 12 floats (3 vertices × 4 coordinates) + 2 bytes
   
@@ -25,12 +24,8 @@ export const generateSTL = async (
   const numTriangles = 
     // Main surface triangles (2 per quad)
     2 * numRadialSegments * numCircularSegments +
-    // Inner wall triangles
-    2 * numCircularSegments +
-    // Outer wall triangles
-    2 * numCircularSegments +
-    // Groove triangles
-    8 * numCircularSegments; // 4 quads per segment for the groove
+    // Wall triangles (8 per segment)
+    8 * numCircularSegments;
 
   // Create STL header and triangle count
   const header = new Uint8Array(80); // Empty header
@@ -80,31 +75,18 @@ export const generateSTL = async (
     }
   }
   
-  // Generate groove triangles on the opposite side
-  const grooveRadius = parameters.grooveDistance;
-  const grooveInnerRadius = grooveRadius - GROOVE_WIDTH / 2;
-  const grooveOuterRadius = grooveRadius + GROOVE_WIDTH / 2;
+  // Generate support wall on the opposite side
+  const wallRadius = parameters.wallDistance;
+  const wallInnerRadius = wallRadius - WALL_WIDTH / 2;
+  const wallOuterRadius = wallRadius + WALL_WIDTH / 2;
   
   for (let j = 0; j < numCircularSegments; j++) {
     const theta1 = (j / numCircularSegments) * Math.PI * 2;
     const theta2 = ((j + 1) / numCircularSegments) * Math.PI * 2;
     
-    // Groove bottom
-    offset = writeTriangle(view, offset, [
-      [grooveInnerRadius * Math.cos(theta1), grooveInnerRadius * Math.sin(theta1), -parameters.grooveDepth],
-      [grooveOuterRadius * Math.cos(theta1), grooveOuterRadius * Math.sin(theta1), -parameters.grooveDepth],
-      [grooveInnerRadius * Math.cos(theta2), grooveInnerRadius * Math.sin(theta2), -parameters.grooveDepth]
-    ]);
-    
-    offset = writeTriangle(view, offset, [
-      [grooveInnerRadius * Math.cos(theta2), grooveInnerRadius * Math.sin(theta2), -parameters.grooveDepth],
-      [grooveOuterRadius * Math.cos(theta1), grooveOuterRadius * Math.sin(theta1), -parameters.grooveDepth],
-      [grooveOuterRadius * Math.cos(theta2), grooveOuterRadius * Math.sin(theta2), -parameters.grooveDepth]
-    ]);
-    
-    // Groove walls
-    offset = writeGrooveWalls(view, offset, theta1, theta2, grooveInnerRadius, 
-                            grooveOuterRadius, parameters.grooveDepth);
+    // Write wall triangles
+    offset = writeWallTriangles(view, offset, theta1, theta2, wallInnerRadius, 
+                               wallOuterRadius, parameters.wallHeight);
   }
 
   return new Blob([buffer], { type: 'application/octet-stream' });
@@ -182,40 +164,53 @@ function calculateNormal(vertices: [number, number, number][]): [number, number,
   return [normal[0] / length, normal[1] / length, normal[2] / length];
 }
 
-// Helper function to write groove wall triangles
-function writeGrooveWalls(
+// Helper function to write wall triangles
+function writeWallTriangles(
   view: DataView,
   offset: number,
   theta1: number,
   theta2: number,
   innerRadius: number,
   outerRadius: number,
-  depth: number
+  height: number
 ): number {
-  // Inner wall
+  // Inner wall face
   offset = writeTriangle(view, offset, [
     [innerRadius * Math.cos(theta1), innerRadius * Math.sin(theta1), 0],
-    [innerRadius * Math.cos(theta1), innerRadius * Math.sin(theta1), -depth],
+    [innerRadius * Math.cos(theta1), innerRadius * Math.sin(theta1), -height],
     [innerRadius * Math.cos(theta2), innerRadius * Math.sin(theta2), 0]
   ]);
   
   offset = writeTriangle(view, offset, [
     [innerRadius * Math.cos(theta2), innerRadius * Math.sin(theta2), 0],
-    [innerRadius * Math.cos(theta1), innerRadius * Math.sin(theta1), -depth],
-    [innerRadius * Math.cos(theta2), innerRadius * Math.sin(theta2), -depth]
+    [innerRadius * Math.cos(theta1), innerRadius * Math.sin(theta1), -height],
+    [innerRadius * Math.cos(theta2), innerRadius * Math.sin(theta2), -height]
   ]);
   
-  // Outer wall
+  // Outer wall face
   offset = writeTriangle(view, offset, [
     [outerRadius * Math.cos(theta1), outerRadius * Math.sin(theta1), 0],
     [outerRadius * Math.cos(theta2), outerRadius * Math.sin(theta2), 0],
-    [outerRadius * Math.cos(theta1), outerRadius * Math.sin(theta1), -depth]
+    [outerRadius * Math.cos(theta1), outerRadius * Math.sin(theta1), -height]
   ]);
   
   offset = writeTriangle(view, offset, [
     [outerRadius * Math.cos(theta2), outerRadius * Math.sin(theta2), 0],
-    [outerRadius * Math.cos(theta2), outerRadius * Math.sin(theta2), -depth],
-    [outerRadius * Math.cos(theta1), outerRadius * Math.sin(theta1), -depth]
+    [outerRadius * Math.cos(theta2), outerRadius * Math.sin(theta2), -height],
+    [outerRadius * Math.cos(theta1), outerRadius * Math.sin(theta1), -height]
+  ]);
+  
+  // Bottom face
+  offset = writeTriangle(view, offset, [
+    [innerRadius * Math.cos(theta1), innerRadius * Math.sin(theta1), -height],
+    [outerRadius * Math.cos(theta1), outerRadius * Math.sin(theta1), -height],
+    [innerRadius * Math.cos(theta2), innerRadius * Math.sin(theta2), -height]
+  ]);
+  
+  offset = writeTriangle(view, offset, [
+    [innerRadius * Math.cos(theta2), innerRadius * Math.sin(theta2), -height],
+    [outerRadius * Math.cos(theta1), outerRadius * Math.sin(theta1), -height],
+    [outerRadius * Math.cos(theta2), outerRadius * Math.sin(theta2), -height]
   ]);
   
   return offset;

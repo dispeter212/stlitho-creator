@@ -16,8 +16,8 @@ const Index = () => {
     minHeight: 0.5,
     outerDiameter: 100,
     innerDiameter: 30,
-    grooveDepth: 1,
-    grooveDistance: 40,
+    wallHeight: 5, // Changed from grooveDepth
+    wallDistance: 40, // Changed from grooveDistance
   });
 
   const handleImageUpload = useCallback((file: File) => {
@@ -147,25 +147,25 @@ const Index = () => {
                   }
                 />
                 <ParameterControl
-                  label="Groove Depth (mm)"
-                  value={parameters.grooveDepth}
-                  min={0.5}
-                  max={3}
+                  label="Wall Height (mm)"
+                  value={parameters.wallHeight}
+                  min={1}
+                  max={10}
                   step={0.1}
-                  onChange={(value) => handleParameterChange("grooveDepth", value)}
+                  onChange={(value) => handleParameterChange("wallHeight", value)}
                 />
                 <ParameterControl
-                  label="Groove Distance from Center (mm)"
-                  value={parameters.grooveDistance}
+                  label="Wall Distance from Center (mm)"
+                  value={parameters.wallDistance}
                   min={20}
                   max={90}
                   step={1}
                   onChange={(value) =>
-                    handleParameterChange("grooveDistance", value)
+                    handleParameterChange("wallDistance", value)
                   }
                 />
                 <div className="text-sm text-zinc-500">
-                  Note: Groove width is fixed at 0.5mm and will be placed on the
+                  Note: Support wall width is fixed at 0.5mm and will be placed on the
                   opposite side of the panel
                 </div>
               </div>
