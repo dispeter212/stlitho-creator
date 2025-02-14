@@ -9,8 +9,11 @@ export const generateSTL = async (
     outerDiameter: number;
     innerDiameter: number;
     grooveDepth: number;
+    grooveDistance: number; // Added new parameter
   }
 ) => {
   // TODO: Implement actual STL generation logic
+  // The groove will be placed on the opposite side of the panel
+  // with a fixed width of 0.5mm at the specified distance from center
   return new Blob([], { type: "application/sla" });
 };

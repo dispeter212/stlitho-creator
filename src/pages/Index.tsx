@@ -16,6 +16,7 @@ const Index = () => {
     outerDiameter: 100,
     innerDiameter: 30,
     grooveDepth: 1,
+    grooveDistance: 40, // New parameter for groove distance from center
   });
 
   const handleImageUpload = useCallback((file: File) => {
@@ -112,6 +113,20 @@ const Index = () => {
                   step={0.1}
                   onChange={(value) => handleParameterChange("grooveDepth", value)}
                 />
+                <ParameterControl
+                  label="Groove Distance from Center (mm)"
+                  value={parameters.grooveDistance}
+                  min={20}
+                  max={90}
+                  step={1}
+                  onChange={(value) =>
+                    handleParameterChange("grooveDistance", value)
+                  }
+                />
+                <div className="text-sm text-zinc-500">
+                  Note: Groove width is fixed at 0.5mm and will be placed on the
+                  opposite side of the panel
+                </div>
               </div>
               <Button
                 onClick={handleGenerate}
