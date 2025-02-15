@@ -1,9 +1,9 @@
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import ReactCrop, { Crop, PixelCrop } from 'react-image-crop';
+import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { toast } from "sonner";
 
@@ -12,20 +12,42 @@ interface ImageUploadProps {
   aspectRatio?: number;
 }
 
+// Function to create an automatic crop with the desired aspect ratio
+function centerAspectCrop(
+  mediaWidth: number,
+  mediaHeight: number,
+  aspect: number,
+) {
+  return centerCrop(
+    makeAspectCrop(
+      {
+        unit: '%',
+        width: 90,
+      },
+      aspect,
+      mediaWidth,
+      mediaHeight,
+    ),
+    mediaWidth,
+    mediaHeight,
+  )
+}
+
 const ImageUpload = ({ onUpload, aspectRatio = 1 }: ImageUploadProps) => {
   const [preview, setPreview] = useState<string | null>(null);
   const [originalImage, setOriginalImage] = useState<string | null>(null);
-  const [crop, setCrop] = useState<Crop>({
-    unit: '%',
-    width: 90,
-    height: 90,
-    x: 5,
-    y: 5
-  });
+  const [crop, setCrop] = useState<Crop>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop | null>(null);
   const [showCropDialog, setShowCropDialog] = useState(false);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const originalFileRef = useRef<File | null>(null);
+
+  const onImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const { width, height } = e.currentTarget;
+    const autoCrop = centerAspectCrop(width, height, aspectRatio);
+    setCrop(autoCrop);
+    setCompletedCrop(autoCrop);
+  }, [aspectRatio]);
 
   const handleFileChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -144,10 +166,13 @@ const ImageUpload = ({ onUpload, aspectRatio = 1 }: ImageUploadProps) => {
       <Dialog open={showCropDialog} onOpenChange={setShowCropDialog}>
         <DialogContent className="max-w-[800px] w-full">
           <DialogHeader>
-            <DialogTitle>Crop Image</DialogTitle>
+            <DialogTitle>Confirm Image Crop</DialogTitle>
           </DialogHeader>
           {originalImage && (
             <div className="space-y-4">
+              <p className="text-sm text-zinc-600">
+                We've automatically cropped your image. You can adjust the crop area if needed, or click "Confirm Crop" to proceed.
+              </p>
               <div className="max-h-[60vh] overflow-auto">
                 <ReactCrop
                   crop={crop}
@@ -160,6 +185,7 @@ const ImageUpload = ({ onUpload, aspectRatio = 1 }: ImageUploadProps) => {
                     src={originalImage}
                     alt="Crop"
                     className="max-w-full"
+                    onLoad={onImageLoad}
                   />
                 </ReactCrop>
               </div>
@@ -171,7 +197,7 @@ const ImageUpload = ({ onUpload, aspectRatio = 1 }: ImageUploadProps) => {
                   Cancel
                 </Button>
                 <Button onClick={handleCropComplete}>
-                  Apply Crop
+                  Confirm Crop
                 </Button>
               </div>
             </div>
