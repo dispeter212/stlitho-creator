@@ -16,13 +16,15 @@ const Index = () => {
     minHeight: 0.5,
     outerDiameter: 100,
     innerDiameter: 30,
-    wallHeight: 5, // Changed from grooveDepth
-    wallDistance: 40, // Changed from grooveDistance
+    wallHeight: 5,
+    wallDistance: 40,
   });
 
   const handleImageUpload = useCallback((file: File) => {
     setImage(file);
-    toast.success("Image uploaded successfully");
+    if (file) {
+      toast.success("Image uploaded successfully");
+    }
   }, []);
 
   const handleParameterChange = useCallback((name: string, value: number) => {
@@ -104,7 +106,11 @@ const Index = () => {
           <div className="grid md:grid-cols-2 gap-8">
             <Card className="p-6 space-y-4">
               <h2 className="text-xl font-medium text-zinc-900">Image Upload</h2>
-              <ImageUpload onUpload={handleImageUpload} />
+              <ImageUpload onUpload={handleImageUpload} aspectRatio={1} />
+              <p className="text-sm text-zinc-500">
+                The image will be cropped to a square to ensure optimal lithophane quality.
+                Use the cropping tool to select the most important part of your image.
+              </p>
             </Card>
 
             <Card className="p-6 space-y-6">
