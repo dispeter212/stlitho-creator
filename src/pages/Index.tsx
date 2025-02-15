@@ -4,11 +4,19 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import ImageUpload from "@/components/ImageUpload";
 import ParameterControl from "@/components/ParameterControl";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { generateSTL } from "@/utils/stlGenerator";
+import ReactCrop, { PixelCrop } from 'react-image-crop';
+import 'react-image-crop/dist/ReactCrop.css';
 
 const Index = () => {
-  const [image, setImage] = useState<File | null>(null);
+  const [originalImage, setOriginalImage] = useState<File | null>(null);
+  const [croppedImage, setCroppedImage] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [showCropDialog, setShowCropDialog] = useState(false);
+  const [crop, setCrop] = useState<PixelCrop>();
+  const [completedCrop, setCompletedCrop] = useState<PixelCrop | null>(null);
   const [parameters, setParameters] = useState({
     maxHeight: 3,
     minHeight: 0.5,
@@ -19,7 +27,7 @@ const Index = () => {
   });
 
   const handleImageUpload = useCallback((file: File) => {
-    setImage(file);
+    setOriginalImage(file);
     if (file) {
       toast.success("Image uploaded successfully");
     }
@@ -29,11 +37,65 @@ const Index = () => {
     setParameters((prev) => ({ ...prev, [name]: value }));
   }, []);
 
-  const handleGenerate = useCallback(async () => {
-    if (!image) {
-      toast.error("Please upload an image first");
-      return;
+  const handleCrop = useCallback(async () => {
+    if (!originalImage) return;
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+
+    try {
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = URL.createObjectURL(originalImage);
+      });
+
+      const size = Math.min(img.width, img.height);
+      canvas.width = size;
+      canvas.height = size;
+
+      if (!ctx) return;
+
+      // Calculate radii in pixels
+      const outerRadius = (size * parameters.outerDiameter) / (2 * Math.max(parameters.outerDiameter, parameters.outerDiameter));
+      const innerRadius = (size * parameters.innerDiameter) / (2 * Math.max(parameters.outerDiameter, parameters.outerDiameter));
+
+      // Create donut mask
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(size / 2, size / 2, outerRadius, 0, Math.PI * 2);
+      ctx.arc(size / 2, size / 2, innerRadius, 0, Math.PI * 2, true);
+      ctx.clip();
+
+      // Draw and crop image
+      const scale = size / Math.min(img.naturalWidth, img.naturalHeight);
+      const x = (size - img.naturalWidth * scale) / 2;
+      const y = (size - img.naturalHeight * scale) / 2;
+
+      ctx.drawImage(img, x, y, img.naturalWidth * scale, img.naturalHeight * scale);
+      ctx.restore();
+
+      const previewBlob = await new Promise<Blob>((resolve) => 
+        canvas.toBlob((blob) => resolve(blob!), 'image/jpeg')
+      );
+
+      const previewFile = new File([previewBlob], originalImage.name, {
+        type: 'image/jpeg',
+      });
+
+      setPreviewUrl(URL.createObjectURL(previewBlob));
+      setCroppedImage(previewFile);
+      setShowCropDialog(true);
+
+    } catch (error) {
+      console.error('Error processing image:', error);
+      toast.error("Failed to process image");
     }
+  }, [originalImage, parameters.outerDiameter, parameters.innerDiameter]);
+
+  const handleConfirmCrop = useCallback(async () => {
+    if (!croppedImage) return;
 
     try {
       // Create a canvas to get the image data
@@ -45,7 +107,7 @@ const Index = () => {
       await new Promise((resolve, reject) => {
         img.onload = resolve;
         img.onerror = reject;
-        img.src = URL.createObjectURL(image);
+        img.src = URL.createObjectURL(croppedImage);
       });
 
       // Set canvas size to match image dimensions
@@ -76,12 +138,13 @@ const Index = () => {
       
       // Clean up
       URL.revokeObjectURL(downloadUrl);
+      setShowCropDialog(false);
       toast.success("STL file generated successfully!");
     } catch (error) {
       console.error("STL generation error:", error);
       toast.error("Failed to generate STL file");
     }
-  }, [image, parameters]);
+  }, [croppedImage, parameters]);
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -104,15 +167,15 @@ const Index = () => {
           <div className="grid md:grid-cols-2 gap-8">
             <Card className="p-6 space-y-4">
               <h2 className="text-xl font-medium text-zinc-900">Image Upload</h2>
-              <ImageUpload 
-                onUpload={handleImageUpload} 
-                outerDiameter={parameters.outerDiameter}
-                innerDiameter={parameters.innerDiameter}
-              />
-              <p className="text-sm text-zinc-500">
-                Your image will be automatically cropped to match the lithophane dimensions.
-                The preview shows exactly how your lithophane will look.
-              </p>
+              <ImageUpload onUpload={handleImageUpload} />
+              {originalImage && (
+                <Button 
+                  onClick={handleCrop}
+                  className="w-full"
+                >
+                  Preview Lithophane
+                </Button>
+              )}
             </Card>
 
             <Card className="p-6 space-y-6">
@@ -173,17 +236,50 @@ const Index = () => {
                   }
                 />
               </div>
-              <Button
-                onClick={handleGenerate}
-                className="w-full bg-zinc-900 hover:bg-zinc-800 text-white"
-                disabled={!image}
-              >
-                Generate STL File
-              </Button>
             </Card>
           </div>
         </div>
       </div>
+
+      <Dialog open={showCropDialog} onOpenChange={setShowCropDialog}>
+        <DialogContent className="max-w-[800px] w-full">
+          <DialogHeader>
+            <DialogTitle>Confirm Lithophane Preview</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-zinc-600">
+              Your image has been processed to match the lithophane dimensions. 
+              The preview shows exactly how your lithophane will look.
+            </p>
+            {previewUrl && (
+              <div className="max-h-[60vh] overflow-auto">
+                <ReactCrop
+                  crop={crop}
+                  onChange={(c) => setCrop(c)}
+                  onComplete={(c) => setCompletedCrop(c)}
+                >
+                  <img
+                    src={previewUrl}
+                    alt="Preview"
+                    className="max-w-full"
+                  />
+                </ReactCrop>
+              </div>
+            )}
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowCropDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleConfirmCrop}>
+                Confirm & Generate STL
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
