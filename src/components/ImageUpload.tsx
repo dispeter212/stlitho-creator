@@ -20,8 +20,7 @@ const ImageUpload = ({ onUpload, aspectRatio = 1 }: ImageUploadProps) => {
     width: 90,
     height: 90,
     x: 5,
-    y: 5,
-    aspect: aspectRatio
+    y: 5
   });
   const [completedCrop, setCompletedCrop] = useState<PixelCrop | null>(null);
   const [showCropDialog, setShowCropDialog] = useState(false);
