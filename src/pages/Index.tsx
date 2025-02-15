@@ -2,8 +2,6 @@
 import { useState, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Slider } from "@/components/ui/slider";
 import ImageUpload from "@/components/ImageUpload";
 import ParameterControl from "@/components/ParameterControl";
 import { toast } from "sonner";
@@ -106,10 +104,14 @@ const Index = () => {
           <div className="grid md:grid-cols-2 gap-8">
             <Card className="p-6 space-y-4">
               <h2 className="text-xl font-medium text-zinc-900">Image Upload</h2>
-              <ImageUpload onUpload={handleImageUpload} aspectRatio={1} />
+              <ImageUpload 
+                onUpload={handleImageUpload} 
+                outerDiameter={parameters.outerDiameter}
+                innerDiameter={parameters.innerDiameter}
+              />
               <p className="text-sm text-zinc-500">
-                The image will be cropped to a square to ensure optimal lithophane quality.
-                Use the cropping tool to select the most important part of your image.
+                Your image will be automatically cropped to match the lithophane dimensions.
+                The preview shows exactly how your lithophane will look.
               </p>
             </Card>
 
@@ -170,10 +172,6 @@ const Index = () => {
                     handleParameterChange("wallDistance", value)
                   }
                 />
-                <div className="text-sm text-zinc-500">
-                  Note: Support wall width is fixed at 0.5mm and will be placed on the
-                  opposite side of the panel
-                </div>
               </div>
               <Button
                 onClick={handleGenerate}

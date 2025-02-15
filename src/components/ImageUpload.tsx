@@ -3,60 +3,88 @@ import { useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop';
+import ReactCrop, { PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { toast } from "sonner";
 
 interface ImageUploadProps {
   onUpload: (file: File) => void;
-  aspectRatio?: number;
+  outerDiameter: number;
+  innerDiameter: number;
 }
 
-// Function to create an automatic crop with the desired aspect ratio
-function centerAspectCrop(
-  mediaWidth: number,
-  mediaHeight: number,
-  aspect: number,
-): PixelCrop {
-  const percentCrop = centerCrop(
-    makeAspectCrop(
-      {
-        unit: '%',
-        width: 90,
-      },
-      aspect,
-      mediaWidth,
-      mediaHeight,
-    ),
-    mediaWidth,
-    mediaHeight,
-  );
-
-  // Convert percent crop to pixel crop
-  return {
-    unit: 'px',
-    x: (percentCrop.x * mediaWidth) / 100,
-    y: (percentCrop.y * mediaHeight) / 100,
-    width: (percentCrop.width * mediaWidth) / 100,
-    height: (percentCrop.height * mediaHeight) / 100
-  };
-}
-
-const ImageUpload = ({ onUpload, aspectRatio = 1 }: ImageUploadProps) => {
+const ImageUpload = ({ onUpload, outerDiameter, innerDiameter }: ImageUploadProps) => {
   const [preview, setPreview] = useState<string | null>(null);
   const [originalImage, setOriginalImage] = useState<string | null>(null);
-  const [crop, setCrop] = useState<PixelCrop>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop | null>(null);
   const [showCropDialog, setShowCropDialog] = useState(false);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const originalFileRef = useRef<File | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const createDonutMask = useCallback((canvas: HTMLCanvasElement, outerRadius: number, innerRadius: number) => {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.save();
+    ctx.beginPath();
+    // Draw outer circle
+    ctx.arc(canvas.width / 2, canvas.height / 2, outerRadius, 0, Math.PI * 2);
+    // Draw inner circle (counterclockwise to create hole)
+    ctx.arc(canvas.width / 2, canvas.height / 2, innerRadius, 0, Math.PI * 2, true);
+    ctx.clip();
+  }, []);
 
   const onImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
-    const { width, height } = e.currentTarget;
-    const autoCrop = centerAspectCrop(width, height, aspectRatio);
-    setCrop(autoCrop);
-    setCompletedCrop(autoCrop);
-  }, [aspectRatio]);
+    const img = e.currentTarget;
+    const canvas = document.createElement('canvas');
+    const size = Math.min(img.width, img.height);
+    canvas.width = size;
+    canvas.height = size;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Calculate radii in pixels
+    const outerRadius = (size * outerDiameter) / (2 * Math.max(outerDiameter, outerDiameter));
+    const innerRadius = (size * innerDiameter) / (2 * Math.max(outerDiameter, outerDiameter));
+
+    // Draw donut shape
+    createDonutMask(canvas, outerRadius, innerRadius);
+    
+    // Draw and crop image
+    const scale = size / Math.min(img.naturalWidth, img.naturalHeight);
+    const x = (size - img.naturalWidth * scale) / 2;
+    const y = (size - img.naturalHeight * scale) / 2;
+    
+    ctx.drawImage(img, x, y, img.naturalWidth * scale, img.naturalHeight * scale);
+    ctx.restore();
+
+    // Create crop area that matches the donut
+    const crop: PixelCrop = {
+      unit: 'px',
+      x: (size - outerRadius * 2) / 2,
+      y: (size - outerRadius * 2) / 2,
+      width: outerRadius * 2,
+      height: outerRadius * 2
+    };
+
+    setCompletedCrop(crop);
+    
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const croppedFile = new File([blob], originalFileRef.current?.name || 'cropped.jpg', {
+          type: 'image/jpeg',
+        });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setPreview(reader.result as string);
+        };
+        reader.readAsDataURL(croppedFile);
+        onUpload(croppedFile);
+      }
+    }, 'image/jpeg');
+  }, [outerDiameter, innerDiameter, createDonutMask, onUpload]);
 
   const handleFileChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -78,69 +106,6 @@ const ImageUpload = ({ onUpload, aspectRatio = 1 }: ImageUploadProps) => {
     },
     []
   );
-
-  const getCroppedImg = useCallback(
-    async (image: HTMLImageElement, crop: PixelCrop) => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        throw new Error('No 2d context');
-      }
-
-      const scaleX = image.naturalWidth / image.width;
-      const scaleY = image.naturalHeight / image.height;
-
-      canvas.width = crop.width;
-      canvas.height = crop.height;
-
-      ctx.drawImage(
-        image,
-        crop.x * scaleX,
-        crop.y * scaleY,
-        crop.width * scaleX,
-        crop.height * scaleY,
-        0,
-        0,
-        crop.width,
-        crop.height
-      );
-
-      return new Promise<File>((resolve, reject) => {
-        canvas.toBlob((blob) => {
-          if (!blob) {
-            reject(new Error('Canvas is empty'));
-            return;
-          }
-          const croppedFile = new File([blob], originalFileRef.current?.name || 'cropped.jpg', {
-            type: 'image/jpeg',
-          });
-          resolve(croppedFile);
-        }, 'image/jpeg');
-      });
-    },
-    []
-  );
-
-  const handleCropComplete = useCallback(async () => {
-    if (!imageRef.current || !completedCrop) {
-      return;
-    }
-
-    try {
-      const croppedFile = await getCroppedImg(imageRef.current, completedCrop);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreview(reader.result as string);
-      };
-      reader.readAsDataURL(croppedFile);
-      onUpload(croppedFile);
-      setShowCropDialog(false);
-      toast.success("Image cropped successfully");
-    } catch (error) {
-      console.error('Error cropping image:', error);
-      toast.error("Failed to crop image");
-    }
-  }, [completedCrop, getCroppedImg, onUpload]);
 
   return (
     <div className="space-y-4">
@@ -180,23 +145,17 @@ const ImageUpload = ({ onUpload, aspectRatio = 1 }: ImageUploadProps) => {
           {originalImage && (
             <div className="space-y-4">
               <p className="text-sm text-zinc-600">
-                We've automatically cropped your image. You can adjust the crop area if needed, or click "Confirm Crop" to proceed.
+                Your image has been automatically cropped to match the lithophane dimensions. 
+                The preview shows exactly how your lithophane will look.
               </p>
               <div className="max-h-[60vh] overflow-auto">
-                <ReactCrop
-                  crop={crop}
-                  onChange={(c) => setCrop(c)}
-                  onComplete={(c) => setCompletedCrop(c)}
-                  aspect={aspectRatio}
-                >
-                  <img
-                    ref={imageRef}
-                    src={originalImage}
-                    alt="Crop"
-                    className="max-w-full"
-                    onLoad={onImageLoad}
-                  />
-                </ReactCrop>
+                <img
+                  ref={imageRef}
+                  src={originalImage}
+                  alt="Crop"
+                  className="max-w-full"
+                  onLoad={onImageLoad}
+                />
               </div>
               <div className="flex justify-end space-x-2">
                 <Button
@@ -205,8 +164,8 @@ const ImageUpload = ({ onUpload, aspectRatio = 1 }: ImageUploadProps) => {
                 >
                   Cancel
                 </Button>
-                <Button onClick={handleCropComplete}>
-                  Confirm Crop
+                <Button onClick={() => setShowCropDialog(false)}>
+                  Confirm
                 </Button>
               </div>
             </div>

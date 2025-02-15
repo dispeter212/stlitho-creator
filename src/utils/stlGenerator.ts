@@ -25,8 +25,8 @@ export const generateSTL = async (
   const numTriangles = 
     // Main surface triangles (2 per quad)
     2 * numRadialSegments * numCircularSegments +
-    // Wall triangles (8 per segment)
-    8 * numCircularSegments;
+    // Support wall triangles (2 per segment)
+    2 * numCircularSegments;
 
   // Create STL header and triangle count
   const header = new Uint8Array(80); // Empty header
@@ -43,7 +43,6 @@ export const generateSTL = async (
   
   // Generate main surface triangles
   for (let i = 0; i < numRadialSegments; i++) {
-    // Fixed: Calculate radius to properly fit between inner and outer diameter
     const r1 = parameters.innerDiameter / 2 + (i / numRadialSegments) * 
                ((parameters.outerDiameter - parameters.innerDiameter) / 2);
     const r2 = parameters.innerDiameter / 2 + ((i + 1) / numRadialSegments) * 
@@ -78,18 +77,25 @@ export const generateSTL = async (
     }
   }
   
-  // Generate support wall on the opposite side
+  // Generate single straight support wall
   const wallRadius = parameters.wallDistance;
-  const wallInnerRadius = wallRadius - WALL_WIDTH / 2;
-  const wallOuterRadius = wallRadius + WALL_WIDTH / 2;
   
   for (let j = 0; j < numCircularSegments; j++) {
     const theta1 = (j / numCircularSegments) * Math.PI * 2;
     const theta2 = ((j + 1) / numCircularSegments) * Math.PI * 2;
     
-    // Write wall triangles
-    offset = writeWallTriangles(view, offset, theta1, theta2, wallInnerRadius, 
-                               wallOuterRadius, parameters.wallHeight);
+    // Wall triangles (just two triangles per segment for a straight wall)
+    offset = writeTriangle(view, offset, [
+      [wallRadius * Math.cos(theta1), wallRadius * Math.sin(theta1), 0],
+      [wallRadius * Math.cos(theta2), wallRadius * Math.sin(theta2), 0],
+      [wallRadius * Math.cos(theta1), wallRadius * Math.sin(theta1), -parameters.wallHeight]
+    ]);
+    
+    offset = writeTriangle(view, offset, [
+      [wallRadius * Math.cos(theta2), wallRadius * Math.sin(theta2), 0],
+      [wallRadius * Math.cos(theta2), wallRadius * Math.sin(theta2), -parameters.wallHeight],
+      [wallRadius * Math.cos(theta1), wallRadius * Math.sin(theta1), -parameters.wallHeight]
+    ]);
   }
 
   return new Blob([buffer], { type: 'application/octet-stream' });
@@ -165,56 +171,4 @@ function calculateNormal(vertices: [number, number, number][]): [number, number,
   
   const length = Math.sqrt(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]);
   return [normal[0] / length, normal[1] / length, normal[2] / length];
-}
-
-// Helper function to write wall triangles
-function writeWallTriangles(
-  view: DataView,
-  offset: number,
-  theta1: number,
-  theta2: number,
-  innerRadius: number,
-  outerRadius: number,
-  height: number
-): number {
-  // Inner wall face
-  offset = writeTriangle(view, offset, [
-    [innerRadius * Math.cos(theta1), innerRadius * Math.sin(theta1), 0],
-    [innerRadius * Math.cos(theta1), innerRadius * Math.sin(theta1), -height],
-    [innerRadius * Math.cos(theta2), innerRadius * Math.sin(theta2), 0]
-  ]);
-  
-  offset = writeTriangle(view, offset, [
-    [innerRadius * Math.cos(theta2), innerRadius * Math.sin(theta2), 0],
-    [innerRadius * Math.cos(theta1), innerRadius * Math.sin(theta1), -height],
-    [innerRadius * Math.cos(theta2), innerRadius * Math.sin(theta2), -height]
-  ]);
-  
-  // Outer wall face
-  offset = writeTriangle(view, offset, [
-    [outerRadius * Math.cos(theta1), outerRadius * Math.sin(theta1), 0],
-    [outerRadius * Math.cos(theta2), outerRadius * Math.sin(theta2), 0],
-    [outerRadius * Math.cos(theta1), outerRadius * Math.sin(theta1), -height]
-  ]);
-  
-  offset = writeTriangle(view, offset, [
-    [outerRadius * Math.cos(theta2), outerRadius * Math.sin(theta2), 0],
-    [outerRadius * Math.cos(theta2), outerRadius * Math.sin(theta2), -height],
-    [outerRadius * Math.cos(theta1), outerRadius * Math.sin(theta1), -height]
-  ]);
-  
-  // Bottom face
-  offset = writeTriangle(view, offset, [
-    [innerRadius * Math.cos(theta1), innerRadius * Math.sin(theta1), -height],
-    [outerRadius * Math.cos(theta1), outerRadius * Math.sin(theta1), -height],
-    [innerRadius * Math.cos(theta2), innerRadius * Math.sin(theta2), -height]
-  ]);
-  
-  offset = writeTriangle(view, offset, [
-    [innerRadius * Math.cos(theta2), innerRadius * Math.sin(theta2), -height],
-    [outerRadius * Math.cos(theta1), outerRadius * Math.sin(theta1), -height],
-    [outerRadius * Math.cos(theta2), outerRadius * Math.sin(theta2), -height]
-  ]);
-  
-  return offset;
 }
