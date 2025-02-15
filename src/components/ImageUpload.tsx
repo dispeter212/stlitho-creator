@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -17,8 +17,8 @@ function centerAspectCrop(
   mediaWidth: number,
   mediaHeight: number,
   aspect: number,
-) {
-  return centerCrop(
+): PixelCrop {
+  const percentCrop = centerCrop(
     makeAspectCrop(
       {
         unit: '%',
@@ -30,13 +30,22 @@ function centerAspectCrop(
     ),
     mediaWidth,
     mediaHeight,
-  )
+  );
+
+  // Convert percent crop to pixel crop
+  return {
+    unit: 'px',
+    x: (percentCrop.x * mediaWidth) / 100,
+    y: (percentCrop.y * mediaHeight) / 100,
+    width: (percentCrop.width * mediaWidth) / 100,
+    height: (percentCrop.height * mediaHeight) / 100
+  };
 }
 
 const ImageUpload = ({ onUpload, aspectRatio = 1 }: ImageUploadProps) => {
   const [preview, setPreview] = useState<string | null>(null);
   const [originalImage, setOriginalImage] = useState<string | null>(null);
-  const [crop, setCrop] = useState<Crop>();
+  const [crop, setCrop] = useState<PixelCrop>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop | null>(null);
   const [showCropDialog, setShowCropDialog] = useState(false);
   const imageRef = useRef<HTMLImageElement | null>(null);
