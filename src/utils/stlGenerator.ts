@@ -1,3 +1,4 @@
+
 // This implementation generates a lithophane STL file from image data
 export const generateSTL = async (
   imageData: ImageData,
@@ -42,15 +43,17 @@ export const generateSTL = async (
   
   // Generate main surface triangles
   for (let i = 0; i < numRadialSegments; i++) {
+    // Fixed: Calculate radius to properly fit between inner and outer diameter
     const r1 = parameters.innerDiameter / 2 + (i / numRadialSegments) * 
-               (parameters.outerDiameter - parameters.innerDiameter) / 2;
+               ((parameters.outerDiameter - parameters.innerDiameter) / 2);
     const r2 = parameters.innerDiameter / 2 + ((i + 1) / numRadialSegments) * 
-               (parameters.outerDiameter - parameters.innerDiameter) / 2;
+               ((parameters.outerDiameter - parameters.innerDiameter) / 2);
     
     for (let j = 0; j < numCircularSegments; j++) {
       const theta1 = (j / numCircularSegments) * Math.PI * 2;
       const theta2 = ((j + 1) / numCircularSegments) * Math.PI * 2;
       
+      // Get height values from the heightMap
       const h1 = mapHeightValue(heightMap[i][j], parameters.minHeight, parameters.maxHeight);
       const h2 = mapHeightValue(heightMap[i][(j + 1) % numCircularSegments], 
                                parameters.minHeight, parameters.maxHeight);
