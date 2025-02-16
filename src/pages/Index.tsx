@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,16 +7,13 @@ import ParameterControl from "@/components/ParameterControl";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { generateSTL } from "@/utils/stlGenerator";
-import ReactCrop, { PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 
 const Index = () => {
   const [originalImage, setOriginalImage] = useState<File | null>(null);
-  const [croppedImage, setCroppedImage] = useState<File | null>(null);
+  const [processedImage, setProcessedImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [showCropDialog, setShowCropDialog] = useState(false);
-  const [crop, setCrop] = useState<PixelCrop>();
-  const [completedCrop, setCompletedCrop] = useState<PixelCrop | null>(null);
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   const [parameters, setParameters] = useState({
     maxHeight: 3,
     minHeight: 0.5,
@@ -36,7 +34,7 @@ const Index = () => {
     setParameters((prev) => ({ ...prev, [name]: value }));
   }, []);
 
-  const handleCrop = useCallback(async () => {
+  const processImage = useCallback(async () => {
     if (!originalImage) return;
 
     const canvas = document.createElement('canvas');
@@ -69,31 +67,21 @@ const Index = () => {
       const y = (size - img.naturalHeight * scale) / 2;
       ctx.drawImage(img, x, y, img.naturalWidth * scale, img.naturalHeight * scale);
 
+      // Create donut mask
       ctx.globalCompositeOperation = 'destination-in';
       ctx.beginPath();
       ctx.arc(centerX, centerY, outerRadius, 0, Math.PI * 2);
       ctx.arc(centerX, centerY, innerRadius, 0, Math.PI * 2, true);
       ctx.fill();
 
+      // Reset composite operation and add black background
       ctx.globalCompositeOperation = 'source-over';
-
       ctx.fillStyle = '#000000';
       ctx.beginPath();
       ctx.rect(0, 0, size, size);
       ctx.arc(centerX, centerY, outerRadius, 0, Math.PI * 2);
       ctx.arc(centerX, centerY, innerRadius, 0, Math.PI * 2, true);
       ctx.fill('evenodd');
-
-      const initialCrop: PixelCrop = {
-        unit: 'px',
-        x: centerX - outerRadius,
-        y: centerY - outerRadius,
-        width: outerRadius * 2,
-        height: outerRadius * 2
-      };
-
-      setCrop(initialCrop);
-      setCompletedCrop(initialCrop);
 
       const previewBlob = await new Promise<Blob>((resolve) => 
         canvas.toBlob((blob) => resolve(blob!), 'image/jpeg')
@@ -104,8 +92,8 @@ const Index = () => {
       });
 
       setPreviewUrl(URL.createObjectURL(previewBlob));
-      setCroppedImage(previewFile);
-      setShowCropDialog(true);
+      setProcessedImage(previewFile);
+      setShowPreviewDialog(true);
 
     } catch (error) {
       console.error('Error processing image:', error);
@@ -113,8 +101,8 @@ const Index = () => {
     }
   }, [originalImage, parameters.outerDiameter, parameters.innerDiameter]);
 
-  const handleConfirmCrop = useCallback(async () => {
-    if (!croppedImage) return;
+  const handleGenerateSTL = useCallback(async () => {
+    if (!processedImage) return;
 
     try {
       const canvas = document.createElement("canvas");
@@ -124,7 +112,7 @@ const Index = () => {
       await new Promise((resolve, reject) => {
         img.onload = resolve;
         img.onerror = reject;
-        img.src = URL.createObjectURL(croppedImage);
+        img.src = URL.createObjectURL(processedImage);
       });
 
       canvas.width = img.width;
@@ -136,7 +124,6 @@ const Index = () => {
       ctx!.drawImage(img, 0, 0);
       
       const imageData = ctx!.getImageData(0, 0, canvas.width, canvas.height);
-
       const stlBlob = await generateSTL(imageData, parameters);
 
       const downloadUrl = URL.createObjectURL(stlBlob);
@@ -149,13 +136,13 @@ const Index = () => {
       document.body.removeChild(downloadLink);
       
       URL.revokeObjectURL(downloadUrl);
-      setShowCropDialog(false);
+      setShowPreviewDialog(false);
       toast.success("STL file generated successfully!");
     } catch (error) {
       console.error("STL generation error:", error);
       toast.error("Failed to generate STL file");
     }
-  }, [croppedImage, parameters]);
+  }, [processedImage, parameters]);
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -181,7 +168,7 @@ const Index = () => {
               <ImageUpload onUpload={handleImageUpload} />
               {originalImage && (
                 <Button 
-                  onClick={handleCrop}
+                  onClick={processImage}
                   className="w-full"
                 >
                   Preview Lithophane
@@ -252,7 +239,7 @@ const Index = () => {
         </div>
       </div>
 
-      <Dialog open={showCropDialog} onOpenChange={setShowCropDialog}>
+      <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
         <DialogContent className="max-w-[800px] w-full">
           <DialogHeader>
             <DialogTitle>Confirm Lithophane Preview</DialogTitle>
@@ -260,48 +247,28 @@ const Index = () => {
           <div className="space-y-4">
             <p className="text-sm text-zinc-600">
               Your image has been processed into a donut shape based on the diameter settings.
-              You can adjust the position within these boundaries.
+              The area between the outer and inner diameter will be used to create the lithophane.
             </p>
             {previewUrl && (
               <div className="max-h-[60vh] overflow-auto">
-                <ReactCrop
-                  crop={crop}
-                  onChange={(c, percentCrop) => {
-                    const image = document.querySelector('.ReactCrop__image') as HTMLImageElement;
-                    if (!image) return;
-
-                    const size = Math.min(image.width, image.height);
-                    const outerRadius = (size * parameters.outerDiameter) / 
-                                    (2 * Math.max(parameters.outerDiameter, parameters.outerDiameter));
-                    
-                    const newCrop = {
-                      ...c,
-                      width: outerRadius * 2,
-                      height: outerRadius * 2,
-                    };
-                    setCrop(newCrop);
-                  }}
-                  onComplete={(c) => setCompletedCrop(c)}
-                  aspect={1}
-                  circularCrop
-                >
+                <div className="relative">
                   <img
                     src={previewUrl}
                     alt="Preview"
-                    className="max-w-full ReactCrop__image"
+                    className="max-w-full"
                   />
-                </ReactCrop>
+                </div>
               </div>
             )}
             <div className="flex justify-end space-x-2">
               <Button
                 variant="outline"
-                onClick={() => setShowCropDialog(false)}
+                onClick={() => setShowPreviewDialog(false)}
               >
                 Cancel
               </Button>
-              <Button onClick={handleConfirmCrop}>
-                Confirm & Generate STL
+              <Button onClick={handleGenerateSTL}>
+                Generate STL
               </Button>
             </div>
           </div>
