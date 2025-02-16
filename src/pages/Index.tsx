@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -60,56 +59,23 @@ const Index = () => {
       const centerX = size / 2;
       const centerY = size / 2;
 
-      // Draw white background
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, size, size);
-
-      // Draw the original image centered
+      // Step 1: Draw original image
       const scale = size / Math.min(img.naturalWidth, img.naturalHeight);
       const x = (size - img.naturalWidth * scale) / 2;
       const y = (size - img.naturalHeight * scale) / 2;
       ctx.drawImage(img, x, y, img.naturalWidth * scale, img.naturalHeight * scale);
 
-      // Create a temporary canvas for the mask
-      const maskCanvas = document.createElement('canvas');
-      maskCanvas.width = size;
-      maskCanvas.height = size;
-      const maskCtx = maskCanvas.getContext('2d');
-
-      if (!maskCtx) return;
-
-      // Draw the donut shape mask
-      maskCtx.fillStyle = '#FFFFFF';
-      maskCtx.fillRect(0, 0, size, size);
-      maskCtx.globalCompositeOperation = 'destination-out';
-      
-      // Draw the outer circle
-      maskCtx.beginPath();
-      maskCtx.arc(centerX, centerY, outerRadius, 0, Math.PI * 2);
-      maskCtx.fill();
-      
-      // Draw the inner circle (creating the donut hole)
-      maskCtx.globalCompositeOperation = 'source-over';
-      maskCtx.beginPath();
-      maskCtx.arc(centerX, centerY, innerRadius, 0, Math.PI * 2);
-      maskCtx.fill();
-
-      // Apply the mask to the main canvas
+      // Step 2: Create clipping path for donut shape
       ctx.globalCompositeOperation = 'destination-in';
-      ctx.drawImage(maskCanvas, 0, 0);
-
-      // Reset composite operation
-      ctx.globalCompositeOperation = 'source-over';
-
-      // Add black background outside the donut
-      ctx.fillStyle = '#000000';
       ctx.beginPath();
-      ctx.rect(0, 0, size, size);
       ctx.arc(centerX, centerY, outerRadius, 0, Math.PI * 2);
+      ctx.arc(centerX, centerY, innerRadius, 0, Math.PI * 2, true);
       ctx.fill();
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, innerRadius, 0, Math.PI * 2);
-      ctx.fill();
+
+      // Step 3: Draw black background
+      ctx.globalCompositeOperation = 'destination-over';
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, size, size);
 
       const previewBlob = await new Promise<Blob>((resolve) => 
         canvas.toBlob((blob) => resolve(blob!), 'image/jpeg')
