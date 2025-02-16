@@ -56,33 +56,27 @@ const Index = () => {
 
       if (!ctx) return;
 
-      // Calculate radii in pixels
       const outerRadius = (size * parameters.outerDiameter) / (2 * Math.max(parameters.outerDiameter, parameters.outerDiameter));
       const innerRadius = (size * parameters.innerDiameter) / (2 * Math.max(parameters.outerDiameter, parameters.outerDiameter));
       const centerX = size / 2;
       const centerY = size / 2;
 
-      // Clear canvas with white background
       ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(0, 0, size, size);
 
-      // Draw the original image
       const scale = size / Math.min(img.naturalWidth, img.naturalHeight);
       const x = (size - img.naturalWidth * scale) / 2;
       const y = (size - img.naturalHeight * scale) / 2;
       ctx.drawImage(img, x, y, img.naturalWidth * scale, img.naturalHeight * scale);
 
-      // Create donut mask
       ctx.globalCompositeOperation = 'destination-in';
       ctx.beginPath();
       ctx.arc(centerX, centerY, outerRadius, 0, Math.PI * 2);
       ctx.arc(centerX, centerY, innerRadius, 0, Math.PI * 2, true);
       ctx.fill();
 
-      // Reset composite operation
       ctx.globalCompositeOperation = 'source-over';
 
-      // Add black background outside the donut
       ctx.fillStyle = '#000000';
       ctx.beginPath();
       ctx.rect(0, 0, size, size);
@@ -90,7 +84,6 @@ const Index = () => {
       ctx.arc(centerX, centerY, innerRadius, 0, Math.PI * 2, true);
       ctx.fill('evenodd');
 
-      // Set initial crop to match the outer diameter
       const initialCrop: PixelCrop = {
         unit: 'px',
         x: centerX - outerRadius,
@@ -124,47 +117,37 @@ const Index = () => {
     if (!croppedImage) return;
 
     try {
-      // Create a canvas to get the image data
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
       const img = new Image();
 
-      // Create a promise to handle image loading
       await new Promise((resolve, reject) => {
         img.onload = resolve;
         img.onerror = reject;
         img.src = URL.createObjectURL(croppedImage);
       });
 
-      // Set canvas size to match image dimensions
       canvas.width = img.width;
       canvas.height = img.height;
       
-      // Clear canvas with white background
       ctx!.fillStyle = '#FFFFFF';
       ctx!.fillRect(0, 0, canvas.width, canvas.height);
       
-      // Draw image to canvas
       ctx!.drawImage(img, 0, 0);
       
-      // Get image data
       const imageData = ctx!.getImageData(0, 0, canvas.width, canvas.height);
 
-      // Generate STL file using the exact same image data as preview
       const stlBlob = await generateSTL(imageData, parameters);
 
-      // Create download link
       const downloadUrl = URL.createObjectURL(stlBlob);
       const downloadLink = document.createElement("a");
       downloadLink.href = downloadUrl;
       downloadLink.download = "lithophane.stl";
       
-      // Trigger download
       document.body.appendChild(downloadLink);
       downloadLink.click();
       document.body.removeChild(downloadLink);
       
-      // Clean up
       URL.revokeObjectURL(downloadUrl);
       setShowCropDialog(false);
       toast.success("STL file generated successfully!");
@@ -283,11 +266,13 @@ const Index = () => {
               <div className="max-h-[60vh] overflow-auto">
                 <ReactCrop
                   crop={crop}
-                  onChange={(c) => {
-                    // Ensure crop stays within the donut shape
-                    const size = Math.min(imageData?.width || 0, imageData?.height || 0);
+                  onChange={(c, percentCrop) => {
+                    const image = document.querySelector('.ReactCrop__image') as HTMLImageElement;
+                    if (!image) return;
+
+                    const size = Math.min(image.width, image.height);
                     const outerRadius = (size * parameters.outerDiameter) / 
-                                      (2 * Math.max(parameters.outerDiameter, parameters.outerDiameter));
+                                    (2 * Math.max(parameters.outerDiameter, parameters.outerDiameter));
                     
                     const newCrop = {
                       ...c,
@@ -303,7 +288,7 @@ const Index = () => {
                   <img
                     src={previewUrl}
                     alt="Preview"
-                    className="max-w-full"
+                    className="max-w-full ReactCrop__image"
                   />
                 </ReactCrop>
               </div>
