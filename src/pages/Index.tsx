@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -60,34 +59,48 @@ const Index = () => {
       // Calculate radii in pixels
       const outerRadius = (size * parameters.outerDiameter) / (2 * Math.max(parameters.outerDiameter, parameters.outerDiameter));
       const innerRadius = (size * parameters.innerDiameter) / (2 * Math.max(parameters.outerDiameter, parameters.outerDiameter));
+      const centerX = size / 2;
+      const centerY = size / 2;
 
-      // Create donut mask
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(size / 2, size / 2, outerRadius, 0, Math.PI * 2);
-      ctx.arc(size / 2, size / 2, innerRadius, 0, Math.PI * 2, true);
-      ctx.clip();
+      // Clear canvas with white background
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, size, size);
 
-      // Draw and crop image
+      // Draw the original image
       const scale = size / Math.min(img.naturalWidth, img.naturalHeight);
       const x = (size - img.naturalWidth * scale) / 2;
       const y = (size - img.naturalHeight * scale) / 2;
-
-      // Clear canvas before drawing
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Draw image with proper positioning and scaling
       ctx.drawImage(img, x, y, img.naturalWidth * scale, img.naturalHeight * scale);
-      ctx.restore();
 
-      // Draw outer mask in black
+      // Create donut mask
+      ctx.globalCompositeOperation = 'destination-in';
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, outerRadius, 0, Math.PI * 2);
+      ctx.arc(centerX, centerY, innerRadius, 0, Math.PI * 2, true);
+      ctx.fill();
+
+      // Reset composite operation
+      ctx.globalCompositeOperation = 'source-over';
+
+      // Add black background outside the donut
       ctx.fillStyle = '#000000';
       ctx.beginPath();
-      ctx.arc(size / 2, size / 2, outerRadius, 0, Math.PI * 2);
-      ctx.arc(size / 2, size / 2, innerRadius, 0, Math.PI * 2, true);
-      ctx.rect(canvas.width, 0, -canvas.width, canvas.height);
-      ctx.fill();
+      ctx.rect(0, 0, size, size);
+      ctx.arc(centerX, centerY, outerRadius, 0, Math.PI * 2);
+      ctx.arc(centerX, centerY, innerRadius, 0, Math.PI * 2, true);
+      ctx.fill('evenodd');
+
+      // Set initial crop to match the outer diameter
+      const initialCrop: PixelCrop = {
+        unit: 'px',
+        x: centerX - outerRadius,
+        y: centerY - outerRadius,
+        width: outerRadius * 2,
+        height: outerRadius * 2
+      };
+
+      setCrop(initialCrop);
+      setCompletedCrop(initialCrop);
 
       const previewBlob = await new Promise<Blob>((resolve) => 
         canvas.toBlob((blob) => resolve(blob!), 'image/jpeg')
@@ -263,15 +276,29 @@ const Index = () => {
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-zinc-600">
-              Your image has been processed to match the lithophane dimensions. 
-              The preview shows exactly how your lithophane will look.
+              Your image has been processed into a donut shape based on the diameter settings.
+              You can adjust the position within these boundaries.
             </p>
             {previewUrl && (
               <div className="max-h-[60vh] overflow-auto">
                 <ReactCrop
                   crop={crop}
-                  onChange={(c) => setCrop(c)}
+                  onChange={(c) => {
+                    // Ensure crop stays within the donut shape
+                    const size = Math.min(imageData?.width || 0, imageData?.height || 0);
+                    const outerRadius = (size * parameters.outerDiameter) / 
+                                      (2 * Math.max(parameters.outerDiameter, parameters.outerDiameter));
+                    
+                    const newCrop = {
+                      ...c,
+                      width: outerRadius * 2,
+                      height: outerRadius * 2,
+                    };
+                    setCrop(newCrop);
+                  }}
                   onComplete={(c) => setCompletedCrop(c)}
+                  aspect={1}
+                  circularCrop
                 >
                   <img
                     src={previewUrl}
