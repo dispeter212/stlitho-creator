@@ -73,8 +73,21 @@ const Index = () => {
       const x = (size - img.naturalWidth * scale) / 2;
       const y = (size - img.naturalHeight * scale) / 2;
 
+      // Clear canvas before drawing
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Draw image with proper positioning and scaling
       ctx.drawImage(img, x, y, img.naturalWidth * scale, img.naturalHeight * scale);
       ctx.restore();
+
+      // Draw outer mask in black
+      ctx.fillStyle = '#000000';
+      ctx.beginPath();
+      ctx.arc(size / 2, size / 2, outerRadius, 0, Math.PI * 2);
+      ctx.arc(size / 2, size / 2, innerRadius, 0, Math.PI * 2, true);
+      ctx.rect(canvas.width, 0, -canvas.width, canvas.height);
+      ctx.fill();
 
       const previewBlob = await new Promise<Blob>((resolve) => 
         canvas.toBlob((blob) => resolve(blob!), 'image/jpeg')
@@ -100,7 +113,7 @@ const Index = () => {
     try {
       // Create a canvas to get the image data
       const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
       const img = new Image();
 
       // Create a promise to handle image loading
@@ -114,15 +127,17 @@ const Index = () => {
       canvas.width = img.width;
       canvas.height = img.height;
       
-      // Draw image to canvas and get image data
-      ctx?.drawImage(img, 0, 0);
-      const imageData = ctx?.getImageData(0, 0, canvas.width, canvas.height);
+      // Clear canvas with white background
+      ctx!.fillStyle = '#FFFFFF';
+      ctx!.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw image to canvas
+      ctx!.drawImage(img, 0, 0);
+      
+      // Get image data
+      const imageData = ctx!.getImageData(0, 0, canvas.width, canvas.height);
 
-      if (!imageData) {
-        throw new Error("Failed to process image");
-      }
-
-      // Generate STL file
+      // Generate STL file using the exact same image data as preview
       const stlBlob = await generateSTL(imageData, parameters);
 
       // Create download link

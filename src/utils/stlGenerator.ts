@@ -12,7 +12,6 @@ export const generateSTL = async (
   }
 ) => {
   // Constants
-  const WALL_WIDTH = 0.5; // Fixed wall width in mm
   const RESOLUTION = Math.min(imageData.width, imageData.height); // Number of segments
   const BYTES_PER_TRIANGLE = 50; // 12 floats (3 vertices × 4 coordinates) + 2 bytes
   
@@ -53,12 +52,13 @@ export const generateSTL = async (
       const theta2 = ((j + 1) / numCircularSegments) * Math.PI * 2;
       
       // Get height values from the heightMap
-      const h1 = mapHeightValue(heightMap[i][j], parameters.minHeight, parameters.maxHeight);
-      const h2 = mapHeightValue(heightMap[i][(j + 1) % numCircularSegments], 
+      // Invert the height values because in preview darker = higher
+      const h1 = mapHeightValue(1 - heightMap[i][j], parameters.minHeight, parameters.maxHeight);
+      const h2 = mapHeightValue(1 - heightMap[i][(j + 1) % numCircularSegments], 
                                parameters.minHeight, parameters.maxHeight);
-      const h3 = mapHeightValue(heightMap[(i + 1) % numRadialSegments][j], 
+      const h3 = mapHeightValue(1 - heightMap[(i + 1) % numRadialSegments][j], 
                                parameters.minHeight, parameters.maxHeight);
-      const h4 = mapHeightValue(heightMap[(i + 1) % numRadialSegments][(j + 1) % numCircularSegments], 
+      const h4 = mapHeightValue(1 - heightMap[(i + 1) % numRadialSegments][(j + 1) % numCircularSegments], 
                                parameters.minHeight, parameters.maxHeight);
       
       // First triangle
