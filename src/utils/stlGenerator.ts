@@ -1,4 +1,3 @@
-
 // This implementation generates a lithophane STL file from image data
 export const generateSTL = async (
   imageData: ImageData,
@@ -60,38 +59,87 @@ export const generateSTL = async (
       const h4 = mapHeightFromGrayscale(heightMap[(i + 1) % numRadialSegments][(j + 1) % numCircularSegments], 
                                parameters.minHeight, parameters.maxHeight);
       
-      // First triangle
+      // First triangle (only upper surface)
       offset = writeTriangle(view, offset, [
         [r1 * Math.cos(theta1), r1 * Math.sin(theta1), h1],
-        [r2 * Math.cos(theta1), r2 * Math.sin(theta1), h3],
-        [r1 * Math.cos(theta2), r1 * Math.sin(theta2), h2]
+        [r1 * Math.cos(theta2), r1 * Math.sin(theta2), h2],
+        [r2 * Math.cos(theta1), r2 * Math.sin(theta1), h3]
       ]);
       
-      // Second triangle
+      // Second triangle (only upper surface)
       offset = writeTriangle(view, offset, [
         [r1 * Math.cos(theta2), r1 * Math.sin(theta2), h2],
-        [r2 * Math.cos(theta1), r2 * Math.sin(theta1), h3],
-        [r2 * Math.cos(theta2), r2 * Math.sin(theta2), h4]
+        [r2 * Math.cos(theta2), r2 * Math.sin(theta2), h4],
+        [r2 * Math.cos(theta1), r2 * Math.sin(theta1), h3]
       ]);
+
+      // Add bottom surface at minHeight
+      offset = writeTriangle(view, offset, [
+        [r1 * Math.cos(theta1), r1 * Math.sin(theta1), parameters.minHeight],
+        [r2 * Math.cos(theta1), r2 * Math.sin(theta1), parameters.minHeight],
+        [r1 * Math.cos(theta2), r1 * Math.sin(theta2), parameters.minHeight]
+      ]);
+      
+      offset = writeTriangle(view, offset, [
+        [r1 * Math.cos(theta2), r1 * Math.sin(theta2), parameters.minHeight],
+        [r2 * Math.cos(theta1), r2 * Math.sin(theta1), parameters.minHeight],
+        [r2 * Math.cos(theta2), r2 * Math.sin(theta2), parameters.minHeight]
+      ]);
+
+      // Add inner wall triangles if this is the innermost segment
+      if (i === 0) {
+        const innerH1 = h1;
+        const innerH2 = h2;
+        
+        offset = writeTriangle(view, offset, [
+          [r1 * Math.cos(theta1), r1 * Math.sin(theta1), parameters.minHeight],
+          [r1 * Math.cos(theta1), r1 * Math.sin(theta1), innerH1],
+          [r1 * Math.cos(theta2), r1 * Math.sin(theta2), innerH2]
+        ]);
+        
+        offset = writeTriangle(view, offset, [
+          [r1 * Math.cos(theta1), r1 * Math.sin(theta1), parameters.minHeight],
+          [r1 * Math.cos(theta2), r1 * Math.sin(theta2), innerH2],
+          [r1 * Math.cos(theta2), r1 * Math.sin(theta2), parameters.minHeight]
+        ]);
+      }
+
+      // Add outer wall triangles if this is the outermost segment
+      if (i === numRadialSegments - 1) {
+        const outerH1 = h3;
+        const outerH2 = h4;
+        
+        offset = writeTriangle(view, offset, [
+          [r2 * Math.cos(theta1), r2 * Math.sin(theta1), parameters.minHeight],
+          [r2 * Math.cos(theta2), r2 * Math.sin(theta2), outerH2],
+          [r2 * Math.cos(theta1), r2 * Math.sin(theta1), outerH1]
+        ]);
+        
+        offset = writeTriangle(view, offset, [
+          [r2 * Math.cos(theta1), r2 * Math.sin(theta1), parameters.minHeight],
+          [r2 * Math.cos(theta2), r2 * Math.sin(theta2), parameters.minHeight],
+          [r2 * Math.cos(theta2), r2 * Math.sin(theta2), outerH2]
+        ]);
+      }
     }
   }
   
-  // Generate single straight support wall
+  // Generate support wall connected to the lithophane's minimum height
   const wallRadius = parameters.wallDistance;
   
   for (let j = 0; j < numCircularSegments; j++) {
     const theta1 = (j / numCircularSegments) * Math.PI * 2;
     const theta2 = ((j + 1) / numCircularSegments) * Math.PI * 2;
     
-    // Wall triangles (just two triangles per segment for a straight wall)
+    // Wall triangles connecting from minHeight to bottom
     offset = writeTriangle(view, offset, [
-      [wallRadius * Math.cos(theta1), wallRadius * Math.sin(theta1), 0],
-      [wallRadius * Math.cos(theta2), wallRadius * Math.sin(theta2), 0],
+      [wallRadius * Math.cos(theta1), wallRadius * Math.sin(theta1), parameters.minHeight],
+      [wallRadius * Math.cos(theta2), wallRadius * Math.sin(theta2), parameters.minHeight],
       [wallRadius * Math.cos(theta1), wallRadius * Math.sin(theta1), -parameters.wallHeight]
     ]);
     
     offset = writeTriangle(view, offset, [
-      [wallRadius * Math.cos(theta2), wallRadius * Math.sin(theta2), 0],
+      [wallRadius * Math.cos(theta2), wallRadius * Math.sin(theta2), parameters.minHeight],
       [wallRadius * Math.cos(theta2), wallRadius * Math.sin(theta2), -parameters.wallHeight],
       [wallRadius * Math.cos(theta1), wallRadius * Math.sin(theta1), -parameters.wallHeight]
     ]);
