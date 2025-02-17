@@ -55,7 +55,6 @@ const Index = () => {
 
       // Calculate radius in pixels based on the parameters
       const outerRadius = (size * parameters.outerDiameter) / (2 * Math.max(parameters.outerDiameter, parameters.outerDiameter));
-      const innerRadius = (size * parameters.innerDiameter) / (2 * Math.max(parameters.outerDiameter, parameters.outerDiameter));
       const centerX = size / 2;
       const centerY = size / 2;
 
@@ -65,14 +64,13 @@ const Index = () => {
       const y = (size - img.naturalHeight * scale) / 2;
       ctx.drawImage(img, x, y, img.naturalWidth * scale, img.naturalHeight * scale);
 
-      // Step 2: Create clipping path for donut shape
+      // Step 2: Create circular clipping path (outer circle only)
       ctx.globalCompositeOperation = 'destination-in';
       ctx.beginPath();
       ctx.arc(centerX, centerY, outerRadius, 0, Math.PI * 2);
-      ctx.arc(centerX, centerY, innerRadius, 0, Math.PI * 2, true);
       ctx.fill();
 
-      // Step 3: Draw black background
+      // Step 3: Draw black background outside the circle
       ctx.globalCompositeOperation = 'destination-over';
       ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, size, size);
@@ -93,7 +91,7 @@ const Index = () => {
       console.error('Error processing image:', error);
       toast.error("Failed to process image");
     }
-  }, [originalImage, parameters.outerDiameter, parameters.innerDiameter]);
+  }, [originalImage, parameters.outerDiameter]);
 
   const handleGenerateSTL = useCallback(async () => {
     if (!processedImage) return;
@@ -112,12 +110,36 @@ const Index = () => {
       canvas.width = img.width;
       canvas.height = img.height;
       
-      ctx!.fillStyle = '#FFFFFF';
-      ctx!.fillRect(0, 0, canvas.width, canvas.height);
-      
+      // First, draw the processed image
       ctx!.drawImage(img, 0, 0);
       
-      const imageData = ctx!.getImageData(0, 0, canvas.width, canvas.height);
+      // Create a second canvas for the final output with center hole
+      const finalCanvas = document.createElement("canvas");
+      finalCanvas.width = canvas.width;
+      finalCanvas.height = canvas.height;
+      const finalCtx = finalCanvas.getContext("2d", { willReadFrequently: true });
+      
+      if (!finalCtx) return;
+      
+      // Draw the processed image
+      finalCtx.drawImage(canvas, 0, 0);
+      
+      // Create the center hole
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const innerRadius = (canvas.width * parameters.innerDiameter) / (2 * Math.max(parameters.outerDiameter, parameters.outerDiameter));
+      
+      finalCtx.globalCompositeOperation = 'destination-out';
+      finalCtx.beginPath();
+      finalCtx.arc(centerX, centerY, innerRadius, 0, Math.PI * 2);
+      finalCtx.fill();
+      
+      // Add black in the center hole
+      finalCtx.globalCompositeOperation = 'destination-over';
+      finalCtx.fillStyle = '#000000';
+      finalCtx.fill();
+      
+      const imageData = finalCtx.getImageData(0, 0, finalCanvas.width, finalCanvas.height);
       const stlBlob = await generateSTL(imageData, parameters);
 
       const downloadUrl = URL.createObjectURL(stlBlob);
