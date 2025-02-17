@@ -51,14 +51,13 @@ export const generateSTL = async (
       const theta1 = (j / numCircularSegments) * Math.PI * 2;
       const theta2 = ((j + 1) / numCircularSegments) * Math.PI * 2;
       
-      // Get height values from the heightMap
-      // Invert the height values because in preview darker = higher
-      const h1 = mapHeightValue(1 - heightMap[i][j], parameters.minHeight, parameters.maxHeight);
-      const h2 = mapHeightValue(1 - heightMap[i][(j + 1) % numCircularSegments], 
+      // Get height values from the heightMap and map them to actual heights
+      const h1 = mapHeightFromGrayscale(heightMap[i][j], parameters.minHeight, parameters.maxHeight);
+      const h2 = mapHeightFromGrayscale(heightMap[i][(j + 1) % numCircularSegments], 
                                parameters.minHeight, parameters.maxHeight);
-      const h3 = mapHeightValue(1 - heightMap[(i + 1) % numRadialSegments][j], 
+      const h3 = mapHeightFromGrayscale(heightMap[(i + 1) % numRadialSegments][j], 
                                parameters.minHeight, parameters.maxHeight);
-      const h4 = mapHeightValue(1 - heightMap[(i + 1) % numRadialSegments][(j + 1) % numCircularSegments], 
+      const h4 = mapHeightFromGrayscale(heightMap[(i + 1) % numRadialSegments][(j + 1) % numCircularSegments], 
                                parameters.minHeight, parameters.maxHeight);
       
       // First triangle
@@ -113,15 +112,25 @@ function processImageToHeightMap(imageData: ImageData, resolution: number): numb
       const y = Math.floor(j * scaleY);
       const idx = (y * imageData.width + x) * 4;
       
-      // Convert RGB to grayscale
+      // Convert RGB to grayscale using proper weights
+      // Note: we're using standard grayscale conversion weights
       const r = imageData.data[idx];
       const g = imageData.data[idx + 1];
       const b = imageData.data[idx + 2];
-      heightMap[i][j] = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+      const grayscale = (r * 0.299 + g * 0.587 + b * 0.114);
+      heightMap[i][j] = grayscale; // Store raw grayscale value (0-255)
     }
   }
   
   return heightMap;
+}
+
+// Helper function to map grayscale values (0-255) to height values
+function mapHeightFromGrayscale(grayscale: number, minHeight: number, maxHeight: number): number {
+  // Map grayscale value (0-255) to height value (minHeight-maxHeight)
+  // Note: We invert the grayscale value because darker colors (lower values) should be higher
+  const normalizedHeight = (255 - grayscale) / 255;
+  return minHeight + (normalizedHeight * (maxHeight - minHeight));
 }
 
 // Helper function to map height values
