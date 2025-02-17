@@ -58,6 +58,10 @@ const Index = () => {
       const centerX = size / 2;
       const centerY = size / 2;
 
+      // Clear canvas with white background
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, size, size);
+
       // Step 1: Draw original image
       const scale = size / Math.min(img.naturalWidth, img.naturalHeight);
       const x = (size - img.naturalWidth * scale) / 2;
@@ -109,10 +113,14 @@ const Index = () => {
 
       canvas.width = img.width;
       canvas.height = img.height;
+
+      // Clear canvas with white background
+      ctx!.fillStyle = '#FFFFFF';
+      ctx!.fillRect(0, 0, canvas.width, canvas.height);
       
-      // First, draw the processed image
+      // Draw the processed image
       ctx!.drawImage(img, 0, 0);
-      
+
       // Create a second canvas for the final output with center hole
       const finalCanvas = document.createElement("canvas");
       finalCanvas.width = canvas.width;
@@ -120,6 +128,10 @@ const Index = () => {
       const finalCtx = finalCanvas.getContext("2d", { willReadFrequently: true });
       
       if (!finalCtx) return;
+
+      // Clear final canvas with white background
+      finalCtx.fillStyle = '#FFFFFF';
+      finalCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
       
       // Draw the processed image
       finalCtx.drawImage(canvas, 0, 0);
@@ -137,7 +149,7 @@ const Index = () => {
       // Add black in the center hole
       finalCtx.globalCompositeOperation = 'destination-over';
       finalCtx.fillStyle = '#000000';
-      finalCtx.fill();
+      finalCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
       
       const imageData = finalCtx.getImageData(0, 0, finalCanvas.width, finalCanvas.height);
       const stlBlob = await generateSTL(imageData, parameters);
