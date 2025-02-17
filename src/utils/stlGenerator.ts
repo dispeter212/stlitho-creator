@@ -124,14 +124,31 @@ export const generateSTL = async (
     }
   }
   
-  // Generate support wall connected to the lithophane's minimum height
+  // Generate support wall and connecting wall
   const wallRadius = parameters.wallDistance;
   
   for (let j = 0; j < numCircularSegments; j++) {
     const theta1 = (j / numCircularSegments) * Math.PI * 2;
     const theta2 = ((j + 1) / numCircularSegments) * Math.PI * 2;
     
-    // Wall triangles connecting from minHeight to bottom
+    // Outer connecting wall from lithophane edge to support wall
+    const outerRadius = parameters.outerDiameter / 2;
+    
+    // First triangle of connecting wall (from outer edge to support wall)
+    offset = writeTriangle(view, offset, [
+      [outerRadius * Math.cos(theta1), outerRadius * Math.sin(theta1), parameters.minHeight],
+      [wallRadius * Math.cos(theta1), wallRadius * Math.sin(theta1), parameters.minHeight],
+      [outerRadius * Math.cos(theta2), outerRadius * Math.sin(theta2), parameters.minHeight]
+    ]);
+    
+    // Second triangle of connecting wall (from outer edge to support wall)
+    offset = writeTriangle(view, offset, [
+      [wallRadius * Math.cos(theta1), wallRadius * Math.sin(theta1), parameters.minHeight],
+      [wallRadius * Math.cos(theta2), wallRadius * Math.sin(theta2), parameters.minHeight],
+      [outerRadius * Math.cos(theta2), outerRadius * Math.sin(theta2), parameters.minHeight]
+    ]);
+    
+    // Support wall triangles connecting from minHeight to bottom
     offset = writeTriangle(view, offset, [
       [wallRadius * Math.cos(theta1), wallRadius * Math.sin(theta1), parameters.minHeight],
       [wallRadius * Math.cos(theta2), wallRadius * Math.sin(theta2), parameters.minHeight],
