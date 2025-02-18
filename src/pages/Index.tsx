@@ -152,23 +152,13 @@ const Index = () => {
       finalCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
       
       const imageData = finalCtx.getImageData(0, 0, finalCanvas.width, finalCanvas.height);
-      const stlBlob = await generateSTL(imageData, parameters);
+      await generateSTL(imageData, parameters);
 
-      const downloadUrl = URL.createObjectURL(stlBlob);
-      const downloadLink = document.createElement("a");
-      downloadLink.href = downloadUrl;
-      downloadLink.download = "lithophane.stl";
-      
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
-      
-      URL.revokeObjectURL(downloadUrl);
       setShowPreviewDialog(false);
-      toast.success("STL file generated successfully!");
+      toast.success("Files generated successfully!");
     } catch (error) {
-      console.error("STL generation error:", error);
-      toast.error("Failed to generate STL file");
+      console.error("File generation error:", error);
+      toast.error("Failed to generate files");
     }
   }, [processedImage, parameters]);
 

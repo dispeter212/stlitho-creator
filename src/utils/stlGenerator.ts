@@ -1,4 +1,59 @@
-// This implementation generates a lithophane STL file from image data
+// This implementation generates lithophane SCAD and STL files from image data
+const generateSCAD = (
+  heightMap: number[][],
+  parameters: {
+    maxHeight: number;
+    minHeight: number;
+    outerDiameter: number;
+    innerDiameter: number;
+    wallHeight: number;
+    wallDistance: number;
+  }
+): string => {
+  const resolution = heightMap.length;
+  let scadContent = '';
+
+  // Add module definition
+  scadContent += 'module lithophane() {\n';
+  scadContent += '  union() {\n';
+
+  // Generate main lithophane surface
+  for (let i = 0; i < resolution; i++) {
+    for (let j = 0; j < resolution; j++) {
+      const r1 = parameters.innerDiameter / 2 + (i / resolution) * 
+                 ((parameters.outerDiameter - parameters.innerDiameter) / 2);
+      const r2 = parameters.innerDiameter / 2 + ((i + 1) / resolution) * 
+                 ((parameters.outerDiameter - parameters.innerDiameter) / 2);
+      const theta1 = (j / resolution) * 360;
+      const theta2 = ((j + 1) / resolution) * 360;
+      
+      const h = mapHeightFromGrayscale(heightMap[i][j], parameters.minHeight, parameters.maxHeight);
+      
+      scadContent += `    translate([${r1 * Math.cos(theta1 * Math.PI / 180)}, ${r1 * Math.sin(theta1 * Math.PI / 180)}, 0])\n`;
+      scadContent += `      cube([${r2-r1}, ${2 * Math.PI * r1 / resolution}, ${h}]);\n`;
+    }
+  }
+
+  // Add support structure
+  scadContent += `    // Support wall\n`;
+  scadContent += `    translate([0, 0, ${-parameters.wallHeight}])\n`;
+  scadContent += `      cylinder(h=${parameters.wallHeight}, r=${parameters.wallDistance}, center=false);\n`;
+  
+  // Add outer wall
+  scadContent += `    // Outer wall\n`;
+  scadContent += `    difference() {\n`;
+  scadContent += `      cylinder(h=${parameters.wallHeight}, r=${parameters.outerDiameter/2}, center=false);\n`;
+  scadContent += `      translate([0, 0, -0.1])\n`;
+  scadContent += `        cylinder(h=${parameters.wallHeight + 0.2}, r=${parameters.wallDistance}, center=false);\n`;
+  scadContent += `    }\n`;
+
+  scadContent += '  }\n';
+  scadContent += '}\n\n';
+  scadContent += 'lithophane();';
+
+  return scadContent;
+};
+
 export const generateSTL = async (
   imageData: ImageData,
   parameters: {
@@ -10,12 +65,26 @@ export const generateSTL = async (
     wallDistance: number;
   }
 ) => {
+  // Convert image to grayscale values and resize
+  const heightMap = processImageToHeightMap(imageData, Math.min(imageData.width, imageData.height));
+  
+  // Generate SCAD content
+  const scadContent = generateSCAD(heightMap, parameters);
+  
+  // Create and download SCAD file
+  const scadBlob = new Blob([scadContent], { type: 'text/plain' });
+  const scadUrl = URL.createObjectURL(scadBlob);
+  const scadLink = document.createElement('a');
+  scadLink.href = scadUrl;
+  scadLink.download = 'lithophane.scad';
+  document.body.appendChild(scadLink);
+  scadLink.click();
+  document.body.removeChild(scadLink);
+  URL.revokeObjectURL(scadUrl);
+
   // Constants
   const RESOLUTION = Math.min(imageData.width, imageData.height); // Number of segments
   const BYTES_PER_TRIANGLE = 50; // 12 floats (3 vertices × 4 coordinates) + 2 bytes
-  
-  // Convert image to grayscale values and resize
-  const heightMap = processImageToHeightMap(imageData, RESOLUTION);
   
   // Calculate number of triangles needed
   const numRadialSegments = RESOLUTION;
