@@ -20,10 +20,24 @@ export const generateSTL = async (
   // Calculate number of triangles needed
   const numRadialSegments = RESOLUTION;
   const numCircularSegments = RESOLUTION;
+  
+  // Calculate total number of triangles:
   const numTriangles = 
     // Main surface triangles (2 per quad)
     2 * numRadialSegments * numCircularSegments +
-    // Support wall triangles (2 per segment)
+    // Bottom surface triangles (2 per quad)
+    2 * numRadialSegments * numCircularSegments +
+    // Inner wall triangles (2 per segment)
+    2 * numCircularSegments +
+    // Outer wall triangles (2 per segment)
+    2 * numCircularSegments +
+    // Connecting wall top face (2 per segment)
+    2 * numCircularSegments +
+    // Connecting wall vertical face (2 per segment)
+    2 * numCircularSegments +
+    // Support wall vertical face (2 per segment)
+    2 * numCircularSegments +
+    // Bottom face triangles (2 per segment)
     2 * numCircularSegments;
 
   // Create STL header and triangle count
@@ -38,7 +52,7 @@ export const generateSTL = async (
   view.setUint32(80, numTriangles, true);
   
   let offset = 84; // Start after header and triangle count
-  
+
   // Generate main surface triangles
   for (let i = 0; i < numRadialSegments; i++) {
     const r1 = parameters.innerDiameter / 2 + (i / numRadialSegments) * 
