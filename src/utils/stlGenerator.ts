@@ -21,7 +21,7 @@ export const generateSTL = async (
   const numRadialSegments = RESOLUTION;
   const numCircularSegments = RESOLUTION;
   
-  // Calculate total number of triangles:
+  // Calculate total number of triangles
   const numTriangles = 
     // Main surface triangles (2 per quad)
     2 * numRadialSegments * numCircularSegments +
@@ -31,14 +31,8 @@ export const generateSTL = async (
     2 * numCircularSegments +
     // Outer wall triangles (2 per segment)
     2 * numCircularSegments +
-    // Connecting wall top face (2 per segment)
-    2 * numCircularSegments +
-    // Connecting wall vertical face (2 per segment)
-    2 * numCircularSegments +
-    // Support wall vertical face (2 per segment)
-    2 * numCircularSegments +
-    // Bottom face triangles (2 per segment)
-    2 * numCircularSegments;
+    // Connecting walls and bottom (8 triangles per segment)
+    8 * numCircularSegments;
 
   // Create STL header and triangle count
   const header = new Uint8Array(80); // Empty header
@@ -64,7 +58,6 @@ export const generateSTL = async (
       const theta1 = (j / numCircularSegments) * Math.PI * 2;
       const theta2 = ((j + 1) / numCircularSegments) * Math.PI * 2;
       
-      // Get height values from the heightMap and map them to actual heights
       const h1 = mapHeightFromGrayscale(heightMap[i][j], parameters.minHeight, parameters.maxHeight);
       const h2 = mapHeightFromGrayscale(heightMap[i][(j + 1) % numCircularSegments], 
                                parameters.minHeight, parameters.maxHeight);
@@ -73,109 +66,99 @@ export const generateSTL = async (
       const h4 = mapHeightFromGrayscale(heightMap[(i + 1) % numRadialSegments][(j + 1) % numCircularSegments], 
                                parameters.minHeight, parameters.maxHeight);
       
-      // First triangle (only upper surface)
+      // Top surface triangles
       offset = writeTriangle(view, offset, [
         [r1 * Math.cos(theta1), r1 * Math.sin(theta1), h1],
-        [r1 * Math.cos(theta2), r1 * Math.sin(theta2), h2],
-        [r2 * Math.cos(theta1), r2 * Math.sin(theta1), h3]
+        [r2 * Math.cos(theta1), r2 * Math.sin(theta1), h3],
+        [r1 * Math.cos(theta2), r1 * Math.sin(theta2), h2]
       ]);
       
-      // Second triangle (only upper surface)
       offset = writeTriangle(view, offset, [
         [r1 * Math.cos(theta2), r1 * Math.sin(theta2), h2],
-        [r2 * Math.cos(theta2), r2 * Math.sin(theta2), h4],
-        [r2 * Math.cos(theta1), r2 * Math.sin(theta1), h3]
+        [r2 * Math.cos(theta1), r2 * Math.sin(theta1), h3],
+        [r2 * Math.cos(theta2), r2 * Math.sin(theta2), h4]
       ]);
 
-      // Add bottom surface at minHeight
+      // Bottom surface triangles
       offset = writeTriangle(view, offset, [
         [r1 * Math.cos(theta1), r1 * Math.sin(theta1), parameters.minHeight],
-        [r2 * Math.cos(theta1), r2 * Math.sin(theta1), parameters.minHeight],
-        [r1 * Math.cos(theta2), r1 * Math.sin(theta2), parameters.minHeight]
+        [r1 * Math.cos(theta2), r1 * Math.sin(theta2), parameters.minHeight],
+        [r2 * Math.cos(theta1), r2 * Math.sin(theta1), parameters.minHeight]
       ]);
       
       offset = writeTriangle(view, offset, [
         [r1 * Math.cos(theta2), r1 * Math.sin(theta2), parameters.minHeight],
-        [r2 * Math.cos(theta1), r2 * Math.sin(theta1), parameters.minHeight],
-        [r2 * Math.cos(theta2), r2 * Math.sin(theta2), parameters.minHeight]
+        [r2 * Math.cos(theta2), r2 * Math.sin(theta2), parameters.minHeight],
+        [r2 * Math.cos(theta1), r2 * Math.sin(theta1), parameters.minHeight]
       ]);
 
-      // Add inner wall triangles if this is the innermost segment
+      // Inner wall triangles
       if (i === 0) {
-        const innerH1 = h1;
-        const innerH2 = h2;
-        
         offset = writeTriangle(view, offset, [
           [r1 * Math.cos(theta1), r1 * Math.sin(theta1), parameters.minHeight],
-          [r1 * Math.cos(theta1), r1 * Math.sin(theta1), innerH1],
-          [r1 * Math.cos(theta2), r1 * Math.sin(theta2), innerH2]
+          [r1 * Math.cos(theta1), r1 * Math.sin(theta1), h1],
+          [r1 * Math.cos(theta2), r1 * Math.sin(theta2), h2]
         ]);
         
         offset = writeTriangle(view, offset, [
           [r1 * Math.cos(theta1), r1 * Math.sin(theta1), parameters.minHeight],
-          [r1 * Math.cos(theta2), r1 * Math.sin(theta2), innerH2],
+          [r1 * Math.cos(theta2), r1 * Math.sin(theta2), h2],
           [r1 * Math.cos(theta2), r1 * Math.sin(theta2), parameters.minHeight]
         ]);
       }
 
-      // Add outer wall triangles if this is the outermost segment
+      // Outer wall triangles
       if (i === numRadialSegments - 1) {
-        const outerH1 = h3;
-        const outerH2 = h4;
-        
         offset = writeTriangle(view, offset, [
           [r2 * Math.cos(theta1), r2 * Math.sin(theta1), parameters.minHeight],
-          [r2 * Math.cos(theta2), r2 * Math.sin(theta2), outerH2],
-          [r2 * Math.cos(theta1), r2 * Math.sin(theta1), outerH1]
+          [r2 * Math.cos(theta2), r2 * Math.sin(theta2), h4],
+          [r2 * Math.cos(theta1), r2 * Math.sin(theta1), h3]
         ]);
         
         offset = writeTriangle(view, offset, [
           [r2 * Math.cos(theta1), r2 * Math.sin(theta1), parameters.minHeight],
           [r2 * Math.cos(theta2), r2 * Math.sin(theta2), parameters.minHeight],
-          [r2 * Math.cos(theta2), r2 * Math.sin(theta2), outerH2]
+          [r2 * Math.cos(theta2), r2 * Math.sin(theta2), h4]
         ]);
       }
     }
   }
   
-  // Generate support wall and connecting wall
+  // Generate connecting wall and support wall
   const wallRadius = parameters.wallDistance;
+  const outerRadius = parameters.outerDiameter / 2;
   
   for (let j = 0; j < numCircularSegments; j++) {
     const theta1 = (j / numCircularSegments) * Math.PI * 2;
     const theta2 = ((j + 1) / numCircularSegments) * Math.PI * 2;
     
-    // Outer connecting wall from lithophane edge to support wall
-    const outerRadius = parameters.outerDiameter / 2;
-    
-    // First triangle of connecting wall (top face)
-    offset = writeTriangle(view, offset, [
-      [outerRadius * Math.cos(theta1), outerRadius * Math.sin(theta1), parameters.minHeight],
-      [wallRadius * Math.cos(theta1), wallRadius * Math.sin(theta1), parameters.minHeight],
-      [outerRadius * Math.cos(theta2), outerRadius * Math.sin(theta2), parameters.minHeight]
-    ]);
-    
-    // Second triangle of connecting wall (top face)
-    offset = writeTriangle(view, offset, [
-      [wallRadius * Math.cos(theta1), wallRadius * Math.sin(theta1), parameters.minHeight],
-      [wallRadius * Math.cos(theta2), wallRadius * Math.sin(theta2), parameters.minHeight],
-      [outerRadius * Math.cos(theta2), outerRadius * Math.sin(theta2), parameters.minHeight]
-    ]);
-    
-    // Connecting wall triangles (vertical face)
+    // Connecting wall top face
     offset = writeTriangle(view, offset, [
       [outerRadius * Math.cos(theta1), outerRadius * Math.sin(theta1), parameters.minHeight],
       [outerRadius * Math.cos(theta2), outerRadius * Math.sin(theta2), parameters.minHeight],
-      [outerRadius * Math.cos(theta1), outerRadius * Math.sin(theta1), -parameters.wallHeight]
+      [wallRadius * Math.cos(theta1), wallRadius * Math.sin(theta1), parameters.minHeight]
+    ]);
+    
+    offset = writeTriangle(view, offset, [
+      [wallRadius * Math.cos(theta1), wallRadius * Math.sin(theta1), parameters.minHeight],
+      [outerRadius * Math.cos(theta2), outerRadius * Math.sin(theta2), parameters.minHeight],
+      [wallRadius * Math.cos(theta2), wallRadius * Math.sin(theta2), parameters.minHeight]
+    ]);
+
+    // Outer vertical wall
+    offset = writeTriangle(view, offset, [
+      [outerRadius * Math.cos(theta1), outerRadius * Math.sin(theta1), parameters.minHeight],
+      [outerRadius * Math.cos(theta1), outerRadius * Math.sin(theta1), -parameters.wallHeight],
+      [outerRadius * Math.cos(theta2), outerRadius * Math.sin(theta2), parameters.minHeight]
     ]);
     
     offset = writeTriangle(view, offset, [
       [outerRadius * Math.cos(theta2), outerRadius * Math.sin(theta2), parameters.minHeight],
-      [outerRadius * Math.cos(theta2), outerRadius * Math.sin(theta2), -parameters.wallHeight],
-      [outerRadius * Math.cos(theta1), outerRadius * Math.sin(theta1), -parameters.wallHeight]
+      [outerRadius * Math.cos(theta1), outerRadius * Math.sin(theta1), -parameters.wallHeight],
+      [outerRadius * Math.cos(theta2), outerRadius * Math.sin(theta2), -parameters.wallHeight]
     ]);
-    
-    // Support wall triangles (vertical face)
+
+    // Support wall vertical face
     offset = writeTriangle(view, offset, [
       [wallRadius * Math.cos(theta1), wallRadius * Math.sin(theta1), parameters.minHeight],
       [wallRadius * Math.cos(theta2), wallRadius * Math.sin(theta2), parameters.minHeight],
@@ -188,7 +171,7 @@ export const generateSTL = async (
       [wallRadius * Math.cos(theta1), wallRadius * Math.sin(theta1), -parameters.wallHeight]
     ]);
 
-    // Bottom face triangles
+    // Bottom face
     offset = writeTriangle(view, offset, [
       [outerRadius * Math.cos(theta1), outerRadius * Math.sin(theta1), -parameters.wallHeight],
       [wallRadius * Math.cos(theta1), wallRadius * Math.sin(theta1), -parameters.wallHeight],
