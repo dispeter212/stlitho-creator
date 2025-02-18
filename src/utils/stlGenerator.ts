@@ -14,41 +14,51 @@ const generateSCAD = (
   let scadContent = '';
 
   // Add module definition
+  scadContent += '// Lithophane generated from image\n';
+  scadContent += '$fn = 100; // Set smooth circles\n\n';
   scadContent += 'module lithophane() {\n';
-  scadContent += '  union() {\n';
+  scadContent += '  difference() {\n';
+  scadContent += '    union() {\n';
 
-  // Generate main lithophane surface
+  // Generate main lithophane surface using polar coordinates
   for (let i = 0; i < resolution; i++) {
     for (let j = 0; j < resolution; j++) {
       const r1 = parameters.innerDiameter / 2 + (i / resolution) * 
                  ((parameters.outerDiameter - parameters.innerDiameter) / 2);
-      const r2 = parameters.innerDiameter / 2 + ((i + 1) / resolution) * 
-                 ((parameters.outerDiameter - parameters.innerDiameter) / 2);
       const theta1 = (j / resolution) * 360;
-      const theta2 = ((j + 1) / resolution) * 360;
       
       const h = mapHeightFromGrayscale(heightMap[i][j], parameters.minHeight, parameters.maxHeight);
       
-      scadContent += `    translate([${r1 * Math.cos(theta1 * Math.PI / 180)}, ${r1 * Math.sin(theta1 * Math.PI / 180)}, 0])\n`;
-      scadContent += `      cube([${r2-r1}, ${2 * Math.PI * r1 / resolution}, ${h}]);\n`;
+      // Use rotate and translate for proper positioning
+      scadContent += `    rotate([0, 0, ${theta1}])\n`;
+      scadContent += `      translate([${r1}, 0, 0])\n`;
+      scadContent += `        cylinder(h=${h}, r1=${2 * Math.PI * r1 / resolution / 2}, r2=${2 * Math.PI * r1 / resolution / 2});\n`;
     }
   }
 
-  // Add support structure
-  scadContent += `    // Support wall\n`;
+  // Add base structure
+  scadContent += '\n    // Base structure\n';
   scadContent += `    translate([0, 0, ${-parameters.wallHeight}])\n`;
-  scadContent += `      cylinder(h=${parameters.wallHeight}, r=${parameters.wallDistance}, center=false);\n`;
-  
-  // Add outer wall
-  scadContent += `    // Outer wall\n`;
-  scadContent += `    difference() {\n`;
-  scadContent += `      cylinder(h=${parameters.wallHeight}, r=${parameters.outerDiameter/2}, center=false);\n`;
-  scadContent += `      translate([0, 0, -0.1])\n`;
-  scadContent += `        cylinder(h=${parameters.wallHeight + 0.2}, r=${parameters.wallDistance}, center=false);\n`;
-  scadContent += `    }\n`;
+  scadContent += '      difference() {\n';
+  // Outer cylinder
+  scadContent += `        cylinder(h=${parameters.wallHeight}, r=${parameters.outerDiameter/2});\n`;
+  // Inner cylinder (hole)
+  scadContent += `        translate([0, 0, -0.1])\n`;
+  scadContent += `          cylinder(h=${parameters.wallHeight + 0.2}, r=${parameters.wallDistance});\n`;
+  scadContent += '      }\n';
 
+  // Close main difference and union
+  scadContent += '    }\n';
+  
+  // Create center hole
+  scadContent += `    translate([0, 0, -${parameters.wallHeight} - 0.1])\n`;
+  scadContent += `      cylinder(h=${parameters.wallHeight + parameters.maxHeight + 0.2}, r=${parameters.innerDiameter/2});\n`;
+  
+  // Close difference
   scadContent += '  }\n';
   scadContent += '}\n\n';
+  
+  // Call the module
   scadContent += 'lithophane();';
 
   return scadContent;
