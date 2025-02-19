@@ -36,18 +36,12 @@ const generateSCAD = (
     }
   }
 
-  // Add base structure
+  // Add base structure (only outer wall)
   scadContent += '\n    // Base structure\n';
   scadContent += `    translate([0, 0, ${-parameters.wallHeight}])\n`;
-  scadContent += '      difference() {\n';
-  // Outer cylinder
-  scadContent += `        cylinder(h=${parameters.wallHeight}, r=${parameters.outerDiameter/2});\n`;
-  // Inner cylinder (hole)
-  scadContent += `        translate([0, 0, -0.1])\n`;
-  scadContent += `          cylinder(h=${parameters.wallHeight + 0.2}, r=${parameters.wallDistance});\n`;
-  scadContent += '      }\n';
+  scadContent += `      cylinder(h=${parameters.wallHeight}, r=${parameters.outerDiameter/2});\n`;
 
-  // Close main difference and union
+  // Close union
   scadContent += '    }\n';
   
   // Create center hole
