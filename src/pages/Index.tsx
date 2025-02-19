@@ -20,6 +20,7 @@ const Index = () => {
     innerDiameter: 30,
     wallHeight: 5,
     wallDistance: 40,
+    wallThickness: 2,
   });
 
   const handleImageUpload = useCallback((file: File) => {
@@ -53,28 +54,23 @@ const Index = () => {
 
       if (!ctx) return;
 
-      // Calculate radius in pixels based on the parameters
       const outerRadius = (size * parameters.outerDiameter) / (2 * Math.max(parameters.outerDiameter, parameters.outerDiameter));
       const centerX = size / 2;
       const centerY = size / 2;
 
-      // Clear canvas with white background
       ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(0, 0, size, size);
 
-      // Step 1: Draw original image
       const scale = size / Math.min(img.naturalWidth, img.naturalHeight);
       const x = (size - img.naturalWidth * scale) / 2;
       const y = (size - img.naturalHeight * scale) / 2;
       ctx.drawImage(img, x, y, img.naturalWidth * scale, img.naturalHeight * scale);
 
-      // Step 2: Create circular clipping path (outer circle only)
       ctx.globalCompositeOperation = 'destination-in';
       ctx.beginPath();
       ctx.arc(centerX, centerY, outerRadius, 0, Math.PI * 2);
       ctx.fill();
 
-      // Step 3: Draw black background outside the circle
       ctx.globalCompositeOperation = 'destination-over';
       ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, size, size);
@@ -114,14 +110,11 @@ const Index = () => {
       canvas.width = img.width;
       canvas.height = img.height;
 
-      // Clear canvas with white background
-      ctx!.fillStyle = '#FFFFFF';
-      ctx!.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
       
-      // Draw the processed image
-      ctx!.drawImage(img, 0, 0);
+      ctx.drawImage(img, 0, 0);
 
-      // Create a second canvas for the final output with center hole
       const finalCanvas = document.createElement("canvas");
       finalCanvas.width = canvas.width;
       finalCanvas.height = canvas.height;
@@ -129,14 +122,11 @@ const Index = () => {
       
       if (!finalCtx) return;
 
-      // Clear final canvas with white background
       finalCtx.fillStyle = '#FFFFFF';
       finalCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
       
-      // Draw the processed image
       finalCtx.drawImage(canvas, 0, 0);
       
-      // Create the center hole
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
       const innerRadius = (canvas.width * parameters.innerDiameter) / (2 * Math.max(parameters.outerDiameter, parameters.outerDiameter));
@@ -146,7 +136,6 @@ const Index = () => {
       finalCtx.arc(centerX, centerY, innerRadius, 0, Math.PI * 2);
       finalCtx.fill();
       
-      // Add black in the center hole
       finalCtx.globalCompositeOperation = 'destination-over';
       finalCtx.fillStyle = '#000000';
       finalCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
@@ -250,6 +239,14 @@ const Index = () => {
                   onChange={(value) =>
                     handleParameterChange("wallDistance", value)
                   }
+                />
+                <ParameterControl
+                  label="Wall Thickness (mm)"
+                  value={parameters.wallThickness}
+                  min={0.5}
+                  max={5}
+                  step={0.1}
+                  onChange={(value) => handleParameterChange("wallThickness", value)}
                 />
               </div>
             </Card>

@@ -8,6 +8,7 @@ const generateSCAD = (
     innerDiameter: number;
     wallHeight: number;
     wallDistance: number;
+    wallThickness: number;
   }
 ): string => {
   const resolution = heightMap.length;
@@ -36,10 +37,19 @@ const generateSCAD = (
     }
   }
 
-  // Add base structure (only outer wall)
-  scadContent += '\n    // Base structure\n';
+  // Add base structure with outer wall
+  scadContent += '\n    // Base structure with outer wall\n';
+  
+  // Base plate
   scadContent += `    translate([0, 0, ${-parameters.wallHeight}])\n`;
   scadContent += `      cylinder(h=${parameters.wallHeight}, r=${parameters.outerDiameter/2});\n`;
+  
+  // Outer wall
+  scadContent += '    difference() {\n';
+  scadContent += `      cylinder(h=${parameters.maxHeight}, r=${parameters.outerDiameter/2});\n`;
+  scadContent += `      translate([0, 0, -0.1])\n`;
+  scadContent += `        cylinder(h=${parameters.maxHeight + 0.2}, r=${parameters.outerDiameter/2 - parameters.wallThickness});\n`;
+  scadContent += '    }\n';
 
   // Close union
   scadContent += '    }\n';
@@ -67,6 +77,7 @@ export const generateSTL = async (
     innerDiameter: number;
     wallHeight: number;
     wallDistance: number;
+    wallThickness: number;
   }
 ) => {
   // Convert image to grayscale values and resize
